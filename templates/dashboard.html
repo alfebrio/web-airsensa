@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Quality Monitor</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        /* CSS Tambahan Khusus untuk Layout 3 Grafik */
+        .charts-wrapper {
+            display: grid;
+            grid-template-columns: 1fr; /* Default 1 kolom (Mobile) */
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        /* Di layar lebar, Grafik Gas full lebar, Suhu & Lembab bersebelahan */
+        @media (min-width: 768px) {
+            .charts-wrapper {
+                grid-template-columns: 1fr 1fr;
+            }
+            /* Grafik Gas/Udara mengambil 2 kolom (full width) */
+            .chart-full-width {
+                grid-column: span 2;
+            }
+        }
+
+        .chart-box {
+            height: 300px; /* Tinggi grafik agar seragam */
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-wind"></i> AirSensa
+            </div>
+            
+            <nav>
+                <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </a>
+                <a href="{{ url_for('riwayat') }}" class="{{ 'active' if request.endpoint == 'riwayat' }}">
+                    <i class="fa-solid fa-history"></i> Riwayat
+                </a>
+                <a href="{{ url_for('pengaturan') }}" class="{{ 'active' if request.endpoint == 'pengaturan' }}">
+                    <i class="fa-solid fa-gear"></i> Pengaturan
+                </a>
+            </nav>
+            
+            <div class="user-profile">
+                <div class="profile-img"></div>
+                <p>Admin</p>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h1>Dashboard Kualitas Udara</h1>
+                <div class="status-badge" id="connection-status">
+                    <span class="dot"></span> Live Data
+                </div>
+            </header>
+
+            <div class="cards-grid">
+                <div class="card sensor-card">
+                    <div class="icon-box pm-box"><i class="fa-solid fa-smog"></i></div>
+                    <div class="card-info">
+                        <h3>PM2.5</h3>
+                        <p class="value" id="pm2_5-val">--</p>
+                        <span class="unit">µg/m³</span>
+                    </div>
+                </div>
+
+                <div class="card sensor-card">
+                    <div class="icon-box pm-box"><i class="fa-solid fa-wind"></i></div>
+                    <div class="card-info">
+                        <h3>Gas (MQ135)</h3>
+                        <p class="value" id="pm10-val">--</p>
+                        <span class="unit">ppm</span>
+                    </div>
+                </div>
+
+                <div class="card sensor-card">
+                    <div class="icon-box temp-box"><i class="fa-solid fa-temperature-high"></i></div>
+                    <div class="card-info">
+                        <h3>Suhu</h3>
+                        <p class="value" id="temp-val">--</p>
+                        <span class="unit">°C</span>
+                    </div>
+                </div>
+
+                <div class="card sensor-card">
+                    <div class="icon-box hum-box"><i class="fa-solid fa-droplet"></i></div>
+                    <div class="card-info">
+                        <h3>Kelembapan</h3>
+                        <p class="value" id="hum-val">--</p>
+                        <span class="unit">%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card status-container" style="margin-top: 20px;">
+                <h2>Analisis Kualitas Saat Ini</h2>
+                <div class="aqi-display" style="display: flex; align-items: center; justify-content: space-around;">
+                    <div class="aqi-circle" id="aqi-circle">
+                        <span id="aqi-value">--</span>
+                    </div>
+                    <div>
+                        <h3 id="aqi-text" style="font-size: 1.5rem;">Memuat...</h3>
+                        <p id="aqi-desc">Menunggu data dari sensor...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-wrapper">
+                
+                <div class="card chart-full-width">
+                    <h2>Grafik Partikel Udara (Gas & Debu)</h2>
+                    <div class="chart-box">
+                        <canvas id="gasChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Grafik Suhu (°C)</h2>
+                    <div class="chart-box">
+                        <canvas id="tempChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Grafik Kelembapan (%)</h2>
+                    <div class="chart-box">
+                        <canvas id="humChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ===========================================
+        // 1. INISIALISASI 3 GRAFIK TERPISAH
+        // ===========================================
+
+        // --- Grafik 1: Gas / Udara ---
+        const ctxGas = document.getElementById('gasChart').getContext('2d');
+        const gasChart = new Chart(ctxGas, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'PM2.5',
+                        data: [],
+                        borderColor: '#6c5ce7',
+                        backgroundColor: 'rgba(108, 92, 231, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Gas MQ135',
+                        data: [],
+                        borderColor: '#a29bfe',
+                        borderDash: [5, 5], // Garis putus-putus
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        // --- Grafik 2: Suhu ---
+        const ctxTemp = document.getElementById('tempChart').getContext('2d');
+        const tempChart = new Chart(ctxTemp, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Suhu (°C)',
+                    data: [],
+                    borderColor: '#e17055', // Oranye
+                    backgroundColor: 'rgba(225, 112, 85, 0.2)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: false } } // Suhu tidak harus mulai dari 0
+            }
+        });
+
+        // --- Grafik 3: Kelembapan ---
+        const ctxHum = document.getElementById('humChart').getContext('2d');
+        const humChart = new Chart(ctxHum, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Kelembapan (%)',
+                    data: [],
+                    borderColor: '#00cec9', // Cyan
+                    backgroundColor: 'rgba(0, 206, 201, 0.2)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, max: 100 } }
+            }
+        });
+
+        // ===========================================
+        // 2. LOGIKA FETCH DATA
+        // ===========================================
+        
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/home');
+                const data = await response.json();
+
+                // Update Angka Digital
+                document.getElementById('pm2_5-val').innerText = data.pm2_5;
+                document.getElementById('pm10-val').innerText = data.pm10;
+                document.getElementById('temp-val').innerText = data.temperature;
+                document.getElementById('hum-val').innerText = data.humidity;
+
+                // Update Status Text AQI
+                updateAQI(data.pm2_5);
+
+                // Update Ketiga Grafik Sekaligus
+                updateAllCharts(data);
+
+            } catch (error) {
+                console.error('Gagal mengambil data:', error);
+            }
+        }
+
+        function updateAQI(pm25) {
+            const circle = document.getElementById('aqi-circle');
+            const text = document.getElementById('aqi-text');
+            const desc = document.getElementById('aqi-desc');
+
+            let status = "", color = "", descText = "";
+
+            if (pm25 <= 30) {
+                status = "BAIK"; color = "#00b894"; descText = "Kualitas udara sangat baik.";
+            } else if (pm25 <= 80) {
+                status = "SEDANG"; color = "#fdcb6e"; descText = "Cukup baik, waspada bagi sensitif.";
+            } else if (pm25 <= 150) {
+                status = "TIDAK SEHAT"; color = "#e17055"; descText = "Kurangi aktivitas di luar.";
+            } else {
+                status = "BERBAHAYA"; color = "#d63031"; descText = "Segera hindari area ini!";
+            }
+
+            circle.style.borderColor = color;
+            circle.style.color = color;
+            document.getElementById('aqi-value').innerText = status;
+            text.innerText = status;
+            text.style.color = color;
+            desc.innerText = descText;
+        }
+
+        function updateAllCharts(data) {
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            // --- Update Grafik Gas ---
+            addChartData(gasChart, now, [data.pm2_5, data.pm10]); // PM10 disini adalah data Gas MQ135
+
+            // --- Update Grafik Suhu ---
+            addChartData(tempChart, now, [data.temperature]);
+
+            // --- Update Grafik Kelembapan ---
+            addChartData(humChart, now, [data.humidity]);
+        }
+
+        function addChartData(chart, label, newValues) {
+            // Tambah Label Waktu
+            chart.data.labels.push(label);
+
+            // Tambah Data untuk setiap Dataset di chart tersebut
+            chart.data.datasets.forEach((dataset, index) => {
+                if (newValues[index] !== undefined) {
+                    dataset.data.push(newValues[index]);
+                }
+            });
+
+            // Geser jika data sudah lebih dari 20 titik
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach((dataset) => {
+                    dataset.data.shift();
+                });
+            }
+            chart.update();
+        }
+
+        // Jalankan Loop
+        setInterval(fetchData, 3000);
+        fetchData();
+    </script>
+</body>
+</html>

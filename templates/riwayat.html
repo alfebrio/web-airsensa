@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riwayat Data - AirSensa</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .table-container { overflow-x: auto; margin-top: 1rem; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        th { text-align: left; padding: 15px; background-color: #6c5ce7; color: white; font-weight: 600; }
+        td { padding: 15px; border-bottom: 1px solid #f1f1f1; color: #333; }
+        tr:hover { background-color: #f8f9fa; }
+        .status-badge-text { font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; }
+        .empty-state { text-align: center; padding: 40px; color: #888; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo"><i class="fa-solid fa-wind"></i> AirSensa</div>
+            <nav>
+                <a href="{{ url_for('index') }}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+                <a href="{{ url_for('riwayat') }}" class="active"><i class="fa-solid fa-history"></i> Riwayat</a>
+                <a href="{{ url_for('pengaturan') }}"><i class="fa-solid fa-gear"></i> Pengaturan</a>
+            </nav>
+            <div class="user-profile"><div class="profile-img"></div><p>Admin</p></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h1>Riwayat Data Sensor</h1>
+                <div class="status-badge"><i class="fa-solid fa-database"></i> Database Connected</div>
+            </header>
+
+            <div class="card" style="padding: 20px;">
+                <h3>Log Data Per 5 Menit</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><i class="fa-regular fa-clock"></i> Waktu</th>
+                                <th>PM2.5 (µg/m³)</th>
+                                <th>Gas/MQ135 (ppm)</th> <th>Suhu (°C)</th>
+                                <th>Kelembapan (%)</th>
+                                <th>Kualitas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if logs %}
+                                {% for log in logs %}
+                                <tr>
+                                    <td>{{ log.timestamp }}</td>
+                                    
+                                    <td><strong>{{ log.pm2_5 }}</strong></td>
+
+                                    <td>{{ log.pm10 }}</td> <td style="color: #e17055;">
+                                        <i class="fa-solid fa-temperature-half"></i> {{ log.temperature }}
+                                    </td>
+
+                                    <td style="color: #0984e3;">
+                                        <i class="fa-solid fa-droplet"></i> {{ log.humidity }}
+                                    </td>
+
+                                    <td>
+                                        {% if log.pm2_5 <= 30 %}
+                                            <span class="status-badge-text" style="background:#def7ec; color:#03543f;">Baik</span>
+                                        {% elif log.pm2_5 <= 80 %}
+                                            <span class="status-badge-text" style="background:#fef3c7; color:#92400e;">Sedang</span>
+                                        {% elif log.pm2_5 <= 150 %}
+                                            <span class="status-badge-text" style="background:#fde8e8; color:#9b1c1c;">Tidak Sehat</span>
+                                        {% else %}
+                                            <span class="status-badge-text" style="background:#7f1d1d; color:#ffffff;">Berbahaya</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="empty-state">
+                                        <i class="fa-solid fa-hourglass-half" style="font-size: 2rem; margin-bottom: 10px; display:block;"></i>
+                                        <p>Menunggu data... (Data otomatis tersimpan setiap 5 menit saat dashboard aktif)</p>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

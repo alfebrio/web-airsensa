@@ -9,8 +9,8 @@ app = Flask(__name__)
 # ==========================================
 # 1. KONFIGURASI FIREBASE
 # ==========================================
-DB_URL = 'https://cat-feeder2-default-rtdb.firebaseio.com'
-DB_SECRET = 'lmisPjzdMuBR1lQgmJBL4zBQvtCbz7btjBGJ7uMa'
+DB_URL = 'FIREBASE_DB_URL'
+DB_SECRET = 'FIREBASE_DB_SECRET'
 
 # Konfigurasi Auto-Save
 LAST_SAVE_TIME = 0
@@ -129,6 +129,3 @@ def save_to_history(data):
 def save_settings_api():
     # ... (Sama seperti sebelumnya) ...
     return jsonify({"status": "success"}), 200
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
